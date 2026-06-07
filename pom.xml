@@ -414,5 +414,12 @@
           <name>Nexus Releases</name>
           <url>http://NEXUS-IP:8081/repository/maven-releases/</url>
       </repository>
+      <snapshotRepository>
+        <id>nexus</id>
+        <name>Nexus Snapshots</name>
+        <url>
+        http://172.31.85.18:8081/repository/maven-snapshots/
+        </url>
+      </snapshotRepository>
   </distributionManagement>
 </project>
