@@ -53,19 +53,12 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                         sh '''
-                        echo "Starting Sonar Scan"
-                        echo "SONAR_HOST_URL=$SONAR_HOST_URL"
-                        echo "SONAR_AUTH_TOKEN=$SONAR_AUTH_TOKEN"
                         export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
                         export PATH=$JAVA_HOME/bin:$PATH
-                        java -version
-                        mvn -version
+
                         mvn sonar:sonar \
                         	-Dsonar.projectKey=petclinic \
                         	-Dsonar.projectName=petclinic \
-                        	-Dsonar.host.url=http://$SONAR_HOST \
-                        	-Dsonar.token=$SONAR_TOKEN \
-                        	-Dcheckstyle.skip=true
                         '''
                 }
             }
