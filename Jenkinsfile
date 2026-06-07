@@ -20,31 +20,10 @@ pipeline {
                     url: 'https://github.com/csjeevan11/spring-petclinic.git'
             }
         }
-        stage('Debug Environment') {
-            steps {
-                sh '''
-                whoami
-                java -version
-                javac -version
-                mvn -version
-                echo JAVA_HOME=$JAVA_HOME
-                which java
-                which javac
-                ls -l $(which java)
-                ls -l $(which javac)
-                '''
-            }
-        }
         stage('Build') {
             steps {
                 sh '''
-                export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-                export PATH=$JAVA_HOME/bin:$PATH
-                java -version
-                javac -version
-                mvn clean package \
-                -DskipTests \
-                -Dcheckstyle.skip=true
+                mvn clean package -DskipTests -Dcheckstyle.skip=true
                 '''
             }
         }
