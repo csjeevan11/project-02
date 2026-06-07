@@ -3,6 +3,7 @@ pipeline {
 
     tools {
         maven 'Maven'
+        jdk 'JDK17'
     }
 
     environment {
@@ -37,6 +38,10 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
+                export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+                export PATH=$JAVA_HOME/bin:$PATH
+                java -version
+                javac -version
                 mvn clean package \
                 -DskipTests \
                 -Dcheckstyle.skip=true
