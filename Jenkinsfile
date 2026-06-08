@@ -72,16 +72,24 @@ pipeline {
                 echo "Stopping old application..."
                 pkill -f spring-petclinic || true
     
-                rm -f app.jar
+                rm -f app.jar maven-metadata.xml
     
-                echo "Downloading latest SNAPSHOT directly from Nexus..."
+                NEXUS_URL=http://172.31.85.18:8081
+
+                echo "Fetching metadata..."
+                wget -q \$NEXUS_URL/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/maven-metadata.xml
+    
+                echo "Extracting latest SNAPSHOT version..."
+                VERSION=\$(grep -oP '(?<=<extension>jar</extension>).*?<value>\\K[^<]+' maven-metadata.xml)
+    
+                echo "Resolved version: \$VERSION"
     
                 wget -O app.jar \
-                http://172.31.85.18:8081/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-4.0.0-SNAPSHOT.jar
-
+                \$NEXUS_URL/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-\$VERSION.jar
+    
                 echo "Starting application..."
                 nohup java -jar app.jar > app.log 2>&1 &
-    
+
                 sleep 10
     
                 ps -ef | grep java | grep app.jar || true
@@ -89,6 +97,7 @@ pipeline {
                 echo "Deployment SUCCESS"
                 EOF
                 """
+
                 }
             }
         }
