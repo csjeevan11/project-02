@@ -75,29 +75,43 @@ pipeline {
                 rm -f app.jar maven-metadata.xml
     
                 NEXUS_URL=http://172.31.85.18:8081
-
-                echo "Fetching metadata..."
+    
+                echo "Downloading metadata..."
                 wget -q \$NEXUS_URL/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/maven-metadata.xml
     
-                echo "Extracting latest SNAPSHOT version..."
-                VERSION=\$(grep -oP '(?<=<extension>jar</extension>).*?<value>\\K[^<]+' maven-metadata.xml)
+                echo "Checking metadata file..."
+                cat maven-metadata.xml
     
-                echo "Resolved version: \$VERSION"
+                if [ ! -s maven-metadata.xml ]; then
+                    echo "❌ metadata missing or empty"
+                    exit 1
+                fi
+
+                echo "Extracting version safely..."
     
+                VERSION=\$(grep '<value>' maven-metadata.xml | tail -1 | sed 's/.*<value>//;s/<\\/value>//')
+    
+                echo "Resolved VERSION: \$VERSION"
+    
+                if [ -z "\$VERSION" ]; then
+                    echo "❌ VERSION extraction failed"
+                    exit 1
+                fi
+    
+                echo "Downloading JAR..."
                 wget -O app.jar \
                 \$NEXUS_URL/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-\$VERSION.jar
-    
+
                 echo "Starting application..."
                 nohup java -jar app.jar > app.log 2>&1 &
-
+    
                 sleep 10
     
                 ps -ef | grep java | grep app.jar || true
     
-                echo "Deployment SUCCESS"
+                echo "DEPLOYMENT SUCCESS"
                 EOF
                 """
-
                 }
             }
         }
