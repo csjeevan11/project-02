@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        SONAR_HOST = "54.197.200.168:9000"
+        SONAR_HOST = "http://54.197.200.168:9000"
         NEXUS_URL  = "http://98.94.20.121:8081"
         APP_SERVER = "172.31.90.5"
     }
@@ -20,6 +20,7 @@ pipeline {
                     url: 'https://github.com/csjeevan11/spring-petclinic.git'
             }
         }
+
         stage('Build') {
             steps {
                 sh '''
@@ -31,14 +32,14 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                        sh '''
-                        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-                        export PATH=$JAVA_HOME/bin:$PATH
+                    sh '''
+                    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+                    export PATH=$JAVA_HOME/bin:$PATH
 
-                        mvn sonar:sonar \
-                        	-Dsonar.projectKey=petclinic \
-                        	-Dsonar.projectName=petclinic \
-                        '''
+                    mvn sonar:sonar \
+                        -Dsonar.projectKey=petclinic \
+                        -Dsonar.projectName=petclinic
+                    '''
                 }
             }
         }
@@ -53,50 +54,58 @@ pipeline {
 
         stage('Upload To Nexus') {
             steps {
-
                 sh '''
-                mvn deploy \
-                -DskipTests \
-                -Dcheckstyle.skip=true
+                mvn deploy -DskipTests -Dcheckstyle.skip=true
                 '''
             }
         }
+
         stage('Deploy To App Server') {
             steps {
                 sshagent(['app-server-ssh']) {
-                sh """
-                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << EOF
-                set -e
-                cd /home/ubuntu
-                echo "Stopping old application..."
-                pkill -f spring-petclinic || true
-                rm -f app.jar
-                echo "Downloading latest snapshot from Nexus..."
-                wget -O app.jar \
-                ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-4.0.0-SNAPSHOT.jar
-                echo "Downloaded artifact:"
-                ls -lh app.jar
-                echo "Starting application..."
-                nohup java -jar app.jar > app.log 2>&1 &
-                sleep 10
-                echo "Running process check..."
-                ps -ef | grep java | grep app.jar || true
-                echo "Deployment completed successfully"
-                EOF
-                """
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << EOF
+                    set -e
+
+                    cd /home/ubuntu
+
+                    echo "Stopping old application..."
+                    pkill -f spring-petclinic || true
+
+                    rm -f app.jar
+
+                    echo "Downloading latest SNAPSHOT from Nexus using Maven dependency plugin..."
+
+                    mvn dependency:get \
+                        -Dartifact=org.springframework.samples:spring-petclinic:4.0.0-SNAPSHOT:jar \
+                        -DremoteRepositories=nexus::default::${NEXUS_URL}/repository/maven-snapshots \
+                        -Ddest=app.jar
+
+                    echo "Downloaded artifact:"
+                    ls -lh app.jar
+
+                    echo "Starting application..."
+                    nohup java -jar app.jar > app.log 2>&1 &
+
+                    sleep 10
+
+                    echo "Running process check..."
+                    ps -ef | grep java | grep app.jar || true
+
+                    echo "Deployment completed successfully"
+                    EOF
+                    """
                 }
             }
         }
     }
 
     post {
-
         success {
             echo 'Application deployed successfully'
         }
-
         failure {
             echo 'Pipeline failed'
         }
     }
-}																																																																			
+}
