@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'slave-01' }
+    agent { label 'war-builder' }
 
     parameters {
         string(name: 'APP_SERVER', defaultValue: '172.31.90.5', description: 'App Server IP')
