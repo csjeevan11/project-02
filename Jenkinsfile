@@ -1,15 +1,21 @@
 pipeline {
     agent any
 
+    parameters {
+        string(name: 'APP_SERVER_IP', defaultValue: '172.31.90.5', description: 'App server IP')
+        string(name: 'NEXUS_IP', defaultValue: '172.31.85.18', description: 'Nexus server IP')
+        string(name: 'SONAR_HOST', defaultValue: 'http://54.197.200.168:9000')
+    }
+
     tools {
         maven 'Maven'
         jdk 'JDK17'
     }
 
     environment {
-        SONAR_HOST = "http://54.197.200.168:9000"
-        NEXUS_URL  = "http://172.31.85.18:8081"
-        APP_SERVER = "172.31.90.5"
+        APP_SERVER = "${params.APP_SERVER_IP}"
+        NEXUS_URL  = "http://${params.NEXUS_IP}:8081"
+        SONAR_HOST = "${params.SONAR_HOST}"
     }
 
     stages {
