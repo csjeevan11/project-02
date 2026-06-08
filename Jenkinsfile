@@ -1,9 +1,16 @@
 pipeline {
-    agent { label 'war-builder' }
+    agent { label 'web-builder' }
 
     parameters {
-        string(name: 'APP_SERVER', defaultValue: '172.31.90.5', description: 'App Server IP')
+
+        string(name: 'APP_SERVER', defaultValue: '172.31.90.5', description: 'Target App Server IP')
+
+        string(name: 'APP_PORT', defaultValue: '8080', description: 'Application Port')
+
         string(name: 'DOCKER_IMAGE', defaultValue: 'csjeevan/petclinic', description: 'Docker Image Name')
+
+        string(name: 'DOCKER_TAG', defaultValue: "${BUILD_NUMBER}", description: 'Image Tag')
+
     }
 
     tools {
@@ -12,9 +19,9 @@ pipeline {
     }
 
     environment {
-        JAVA_HOME = tool 'JDK17'
-        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
-        DOCKER_TAG = "${BUILD_NUMBER}"
+        IMAGE = "${params.DOCKER_IMAGE}"
+        TAG = "${params.DOCKER_TAG}"
+        FULL_IMAGE = "${params.DOCKER_IMAGE}:${params.DOCKER_TAG}"
     }
 
     stages {
@@ -26,22 +33,24 @@ pipeline {
             }
         }
 
-        stage('Build Jar') {
+        stage('Build Application') {
             steps {
-                sh 'mvn clean package -DskipTests -Dcheckstyle.skip=true'
+                sh """
+                    mvn clean package -DskipTests
+                """
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 sh """
-                docker build -t ${params.DOCKER_IMAGE}:${DOCKER_TAG} .
-                docker tag ${params.DOCKER_IMAGE}:${DOCKER_TAG} ${params.DOCKER_IMAGE}:latest
+                    docker build -t ${FULL_IMAGE} .
+                    docker tag ${FULL_IMAGE} ${IMAGE}:latest
                 """
             }
         }
 
-        stage('Push Image') {
+        stage('Docker Login & Push') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -49,27 +58,36 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh """
-                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                    docker push ${params.DOCKER_IMAGE}:${DOCKER_TAG}
-                    docker push ${params.DOCKER_IMAGE}:latest
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${FULL_IMAGE}
+                        docker push ${IMAGE}:latest
                     """
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to App Server') {
             steps {
                 sshagent(['app-server-ssh']) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no ubuntu@${params.APP_SERVER} '
-                        docker pull ${params.DOCKER_IMAGE}:latest || true
+                        ssh -o StrictHostKeyChecking=no ubuntu@${params.APP_SERVER} '
+                            set -e
 
-                        docker stop petclinic || true
-                        docker rm petclinic || true
+                            echo "Pulling latest image..."
+                            docker pull ${IMAGE}:latest
 
-                        docker run -d --name petclinic -p 8080:8080 \
-                        ${params.DOCKER_IMAGE}:latest
-                    '
+                            echo "Stopping old container..."
+                            docker stop petclinic || true
+                            docker rm petclinic || true
+
+                            echo "Starting new container..."
+                            docker run -d \
+                              --name petclinic \
+                              -p ${params.APP_PORT}:8080 \
+                              ${IMAGE}:latest
+
+                            echo "Deployment completed"
+                        '
                     """
                 }
             }
@@ -78,10 +96,15 @@ pipeline {
 
     post {
         success {
-            echo "Deployment successful"
+            echo "Pipeline SUCCESS: Application deployed successfully"
         }
+
         failure {
-            echo "Pipeline failed"
+            echo "Pipeline FAILED: Check logs"
+        }
+
+        always {
+            cleanWs()
         }
     }
 }
