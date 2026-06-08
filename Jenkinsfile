@@ -65,43 +65,23 @@ pipeline {
             steps {
                 sshagent(['app-server-ssh']) {
                 sh """
-                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} <<EOF
+                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << EOF
                 set -e
-                
                 cd /home/ubuntu
-                
                 echo "Stopping old application..."
                 pkill -f spring-petclinic || true
-                
-                rm -f app.jar maven-metadata.xml
-
-                echo "Downloading metadata..."
-                wget -q ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/maven-metadata.xml
-
-                echo "Metadata downloaded:"
-                cat maven-metadata.xml
-
-                VERSION=\$(grep -A1 '<extension>jar</extension>' maven-metadata.xml \
-                | grep '<value>' \
-                | sed -E 's/.*<value>(.*)<\\/value>.*/\\1/')
-
-                echo "Latest Snapshot Version: \$VERSION"
-
+                rm -f app.jar
+                echo "Downloading latest snapshot from Nexus..."
                 wget -O app.jar \
-                ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-\${VERSION}.jar
-
+                ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-4.0.0-SNAPSHOT.jar
+                echo "Downloaded artifact:"
                 ls -lh app.jar
-
                 echo "Starting application..."
                 nohup java -jar app.jar > app.log 2>&1 &
-
                 sleep 10
-
-                echo "Running processes:"
+                echo "Running process check..."
                 ps -ef | grep java | grep app.jar || true
-                
                 echo "Deployment completed successfully"
-                
                 EOF
                 """
                 }
