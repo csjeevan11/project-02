@@ -61,36 +61,50 @@ pipeline {
                 '''
             }
         }
-
         stage('Deploy To App Server') {
             steps {
-        	    sshagent(['app-server-ssh']) {
-            		sh """
-            		ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} <<EOF
-            		set -e
-            		cd /home/ubuntu
-            		pkill -f spring-petclinic || true
-            		rm -f app.jar maven-metadata.xml
-            		wget -q ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/maven-metadata.xml
+                sshagent(['app-server-ssh']) {
+                sh """
+                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} <<EOF
+                set -e
+                
+                cd /home/ubuntu
+                
+                echo "Stopping old application..."
+                pkill -f spring-petclinic || true
+                
+                rm -f app.jar maven-metadata.xml
 
-            		VERSION=$(grep -A1 '<extension>jar</extension>' maven-metadata.xml \
-            		| grep '<value>' \
-            		| sed -E 's/.*<value>(.*)<\/value>.*/\1/')
+                echo "Downloading metadata..."
+                wget -q ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/maven-metadata.xml
 
-            		echo "Latest Snapshot Version: \$VERSION"
+                echo "Metadata downloaded:"
+                cat maven-metadata.xml
 
-            		wget -O app.jar ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-\${VERSION}.jar
+                VERSION=\$(grep -A1 '<extension>jar</extension>' maven-metadata.xml \
+                | grep '<value>' \
+                | sed -E 's/.*<value>(.*)<\\/value>.*/\\1/')
 
-            		ls -lh app.jar
+                echo "Latest Snapshot Version: \$VERSION"
 
-            		nohup java -jar app.jar > app.log 2>&1 &
+                wget -O app.jar \
+                ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-\${VERSION}.jar
 
-            		sleep 10
+                ls -lh app.jar
 
-            		ps -ef | grep java | grep app.jar || true
-            		EOF
-            		"""
-        	    }
+                echo "Starting application..."
+                nohup java -jar app.jar > app.log 2>&1 &
+
+                sleep 10
+
+                echo "Running processes:"
+                ps -ef | grep java | grep app.jar || true
+                
+                echo "Deployment completed successfully"
+                
+                EOF
+                """
+                }
             }
         }
     }
