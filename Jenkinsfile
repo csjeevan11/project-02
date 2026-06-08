@@ -64,7 +64,7 @@ pipeline {
         steps {
             sshagent(['app-server-ssh']) {
                 sh """
-                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << 'EOF'
+                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << EOF
                 set -e
 
                 cd /home/ubuntu
