@@ -60,41 +60,41 @@ pipeline {
             }
         }
 
-        stage('Deploy To App Server') {
-            steps {
-                sshagent(['app-server-ssh']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << EOF
-                    set -e
+    stage('Deploy To App Server') {
+        steps {
+            sshagent(['app-server-ssh']) {
+                sh """
+                ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << 'EOF'
+                set -e
+    
+                cd /home/ubuntu
+    
+                echo "Stopping old application..."
+                pkill -f spring-petclinic || true
+    
+                rm -f app.jar
 
-                    cd /home/ubuntu
+                echo "Fetching latest SNAPSHOT metadata..."
+                wget -q ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/maven-metadata.xml
+    
+                VERSION=\$(grep -oP '(?<=<extension>jar</extension>).*?<value>\\K[^<]+' maven-metadata.xml)
+    
+                echo "Resolved version: \$VERSION"
+    
+                echo "Downloading jar..."
+                wget -O app.jar \
+                ${NEXUS_URL}/repository/maven-snapshots/org/springframework/samples/spring-petclinic/4.0.0-SNAPSHOT/spring-petclinic-\${VERSION}.jar
+    
+                echo "Starting application..."
+                nohup java -jar app.jar > app.log 2>&1 &
+    
+                sleep 10
 
-                    echo "Stopping old application..."
-                    pkill -f spring-petclinic || true
-
-                    rm -f app.jar
-
-                    echo "Downloading latest SNAPSHOT from Nexus using Maven dependency plugin..."
-
-                    mvn dependency:get \
-                        -Dartifact=org.springframework.samples:spring-petclinic:4.0.0-SNAPSHOT:jar \
-                        -DremoteRepositories=nexus::default::${NEXUS_URL}/repository/maven-snapshots \
-                        -Ddest=app.jar
-
-                    echo "Downloaded artifact:"
-                    ls -lh app.jar
-
-                    echo "Starting application..."
-                    nohup java -jar app.jar > app.log 2>&1 &
-
-                    sleep 10
-
-                    echo "Running process check..."
-                    ps -ef | grep java | grep app.jar || true
-
-                    echo "Deployment completed successfully"
-                    EOF
-                    """
+                ps -ef | grep java | grep app.jar || true
+    
+                echo "Deployment successful"
+                EOF
+                """
                 }
             }
         }
