@@ -7,7 +7,6 @@ pipeline {
         string(name: 'SONAR_HOST', defaultValue: 'http://18.205.159.66:9000')
     }
 
-    }
 
     tools {
         maven 'Maven'
