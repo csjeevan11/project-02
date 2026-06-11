@@ -14,9 +14,8 @@ pipeline {
     }
 
     environment {
-        IMAGE = "${params.DOCKER_IMAGE}"
-        TAG = "${params.DOCKER_TAG}"
-        FULL_IMAGE = "${params.DOCKER_IMAGE}:${params.DOCKER_TAG}"
+        IMAGE_NAME = "jeevan11cs/spring-petclinic"
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -43,8 +42,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh """
-                    docker build -t ${FULL_IMAGE} .
-                    docker tag ${FULL_IMAGE} ${IMAGE}:latest
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 """
             }
         }
@@ -58,8 +56,7 @@ pipeline {
                 )]) {
                     sh """
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push ${FULL_IMAGE}
-                        docker push ${IMAGE}:latest
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     """
                 }
             }
@@ -71,9 +68,9 @@ pipeline {
                     sh """
                         ssh -o StrictHostKeyChecking=no ubuntu@${params.APP_SERVER} '
                             set -e
-
+                            docker image prune -f || true
                             echo "Pulling latest image..."
-                            docker pull ${IMAGE}:latest
+                            docker pull ${IMAGE_NAME}:${IMAGE_TAG}
 
                             echo "Stopping old container..."
                             docker stop petclinic || true
@@ -83,7 +80,8 @@ pipeline {
                             docker run -d \
                               --name petclinic \
                               -p ${params.APP_PORT}:8080 \
-                              ${IMAGE}:latest
+                              --restart unless-stopped \
+                              ${IMAGE_NAME}:${IMAGE_TAG}
 
                             echo "Deployment completed"
                         '
