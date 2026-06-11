@@ -5,6 +5,7 @@ pipeline {
         string(name: 'APP_SERVER_IP', defaultValue: '172.31.90.5', description: 'App server IP')
         string(name: 'NEXUS_IP', defaultValue: '172.31.85.18', description: 'Nexus server IP')
         string(name: 'SONAR_HOST', defaultValue: 'http://18.205.159.66:9000')
+        string(name: 'APP_PORT', defaultValue: '8080', description: 'App port')
     }
 
 
@@ -66,7 +67,7 @@ pipeline {
             steps {
                 sshagent(['app-server-ssh']) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ubuntu@${params.APP_SERVER} '
+                        ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} '
                             set -e
                             docker image prune -f || true
                             echo "Pulling latest image..."
