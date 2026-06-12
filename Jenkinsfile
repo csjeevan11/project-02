@@ -1,11 +1,8 @@
 pipeline {
-    agent any
+    agent { label 'node-01' }
 
     parameters {
-        string(name: 'APP_SERVER_IP', defaultValue: '172.31.90.5', description: 'App server IP')
-        string(name: 'APP_PORT', defaultValue: '8080', description: 'App port')
-        string(name: 'NEXUS_IP', defaultValue: '172.31.85.18', description: 'Nexus server IP')
-        string(name: 'SONAR_HOST', defaultValue: 'http://18.205.159.66:9000', description: 'SonarQube URL')
+        string(name: 'SONAR_HOST', defaultValue: 'http://18.205.106.241:9000', description: 'SonarQube URL')
     }
 
     tools {
@@ -16,8 +13,12 @@ pipeline {
     environment {
         IMAGE_NAME = "jeevan11cs/spring-petclinic"
         IMAGE_TAG  = "${BUILD_NUMBER}"
-        NEXUS_URL  = "http://${params.NEXUS_IP}:8081"
         SONAR_HOST = "${params.SONAR_HOST}"
+        K8S_NAMESPACE = "petclinic"
+        HELM_RELEASE  = "petclinic"
+        DOCKER_BUILDKIT = "1"
+        JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
+        PATH = "${JAVA_HOME}/bin:${PATH}"
     }
 
     stages {
@@ -85,42 +86,63 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy to App Server') {
+        
+        stage('Docker Cleanup') {
             steps {
-                sshagent(['app-server-ssh']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ubuntu@${params.APP_SERVER_IP} '
-                            set -e
+                sh '''
+                    docker image prune -f || true
+                '''
+            }
+        }
 
-                            IMAGE_NAME=${IMAGE_NAME}
-                            IMAGE_TAG=${IMAGE_TAG}
+        stage('Helm Deploy To Kubernetes') {
+            steps {
+                sh '''
+                    kubectl config current-context
+                    
+                    helm upgrade --install ${HELM_RELEASE} \
+                    ./helm-charts/spring-petclinic \
+                    -n ${K8S_NAMESPACE} \
+                    --set image.repository=${IMAGE_NAME} \
+                    --set image.tag=${IMAGE_TAG}
 
-                            echo "Pulling image..."
-                            docker pull \$IMAGE_NAME:\$IMAGE_TAG
+                    kubectl rollout status deployment/petclinic \
+                    -n ${K8S_NAMESPACE} \
+                    --timeout=300s
 
-                            echo "Stopping old container..."
-                            docker stop petclinic || true
-                            docker rm petclinic || true
+                    kubectl get deployment petclinic \
+                    -n ${K8S_NAMESPACE} \
+                    -o=jsonpath='{.spec.template.spec.containers[0].image}'
+                '''
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                    echo "===== PODS ====="
+                    kubectl get pods -n ${K8S_NAMESPACE}
 
-                            echo "Starting new container..."
-                            docker run -d \
-                              --name petclinic \
-                              -p ${params.APP_PORT}:8080 \
-                              --restart unless-stopped \
-                              \$IMAGE_NAME:\$IMAGE_TAG
+                    echo "===== SERVICE ====="
+                    kubectl get svc -n ${K8S_NAMESPACE}
 
-                            echo "Deployment completed successfully"
-                        '
-                    """
-                }
+                    echo "===== INGRESS ====="
+                    kubectl get ingress -n ${K8S_NAMESPACE}
+
+                    echo "===== HELM RELEASE ====="
+                    helm list -n ${K8S_NAMESPACE}
+                '''   
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline SUCCESS: Application deployed successfully"
+            echo "SUCCESS: Build ${BUILD_NUMBER} deployed to Kubernetes"
+            sh '''
+                helm history petclinic -n petclinic
+                helm status petclinic -n petclinic
+            '''
         }
         failure {
             echo "Pipeline FAILED: Check logs"
