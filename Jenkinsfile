@@ -100,7 +100,7 @@ pipeline {
                     kubectl config current-context
                     
                     helm upgrade --install ${HELM_RELEASE} \
-                    ./helm-charts/spring-petclinic \
+                    /home/jenkins/helm-charts/spring-petclinic \
                     -n ${K8S_NAMESPACE} \
                     --set image.repository=${IMAGE_NAME} \
                     --set image.tag=${IMAGE_TAG}
