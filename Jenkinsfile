@@ -16,7 +16,6 @@ pipeline {
         SONAR_HOST = "${params.SONAR_HOST}"
         K8S_NAMESPACE = "petclinic"
         HELM_RELEASE  = "petclinic"
-        DOCKER_BUILDKIT = "1"
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
         PATH = "${JAVA_HOME}/bin:${PATH}"
     }
